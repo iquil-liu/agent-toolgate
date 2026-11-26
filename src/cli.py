@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 
 def find_root(explicit: str | None) -> Path:
@@ -15,10 +16,10 @@ def find_root(explicit: str | None) -> Path:
     if explicit:
         root = Path(explicit).expanduser().resolve()
     else:
-        candidates = [Path.cwd(), *Path.cwd().parents, Path(__file__).resolve().parents[1]]
+        candidates = [Path.cwd(), *Path.cwd().parents]
         root = next((path for path in candidates if (path / "corpus" / "manifest.json").exists()), None)
         if root is None:
-            raise SystemExit("Cannot locate corpus/manifest.json; pass --root <repo dir>.")
+            raise SystemExit("Cannot locate corpus/manifest.json; run `toolgate ingest --from <notes> --root <kb>` or pass --root <kb>.")
         root = Path(root).resolve()
     if not (root / "corpus" / "manifest.json").exists():
         raise SystemExit(f"No corpus/manifest.json under {root}; run `toolgate ingest` first.")
@@ -42,11 +43,11 @@ def title_of(raw: bytes, fallback: str) -> str:
 
 def build_manifest(docs_dir: Path, description: str) -> dict:
     documents = []
-    for path in sorted(docs_dir.glob("*.md")):
+    for path in sorted(docs_dir.rglob("*.md")):
         raw = path.read_bytes()
         documents.append({
-            "doc_id": slug(path.stem),
-            "path": f"docs/{path.name}",
+            "doc_id": "/".join(slug(part) for part in path.relative_to(docs_dir).with_suffix("").parts),
+            "path": "docs/" + path.relative_to(docs_dir).as_posix(),
             "title": title_of(raw, path.stem),
             "tags": [],
             "mtime_ns": path.stat().st_mtime_ns,
@@ -64,28 +65,68 @@ def command_ingest(args: argparse.Namespace) -> None:
         raise SystemExit(f"Not a directory: {source}")
     root = Path(args.root).expanduser().resolve()
     docs_dir = root / "docs"
-    docs_dir.mkdir(parents=True, exist_ok=True)
-    if args.clean:
-        for path in docs_dir.glob("*.md"):
-            path.unlink()
+    resolved_docs = docs_dir.resolve()
+    if source == resolved_docs or source.is_relative_to(resolved_docs) or resolved_docs.is_relative_to(source):
+        raise SystemExit("Source and root/docs must not be equal or contain each other.")
     markdown = sorted(source.rglob("*.md") if args.recursive else source.glob("*.md"))
-    copied = 0
-    for path in markdown:
-        target = docs_dir / path.name
-        if target.exists() and target.resolve() == path.resolve():
-            continue
-        shutil.copy2(path, target)
-        copied += 1
-    if not any(docs_dir.glob("*.md")):
+    incoming = {path.relative_to(source): path.read_bytes() for path in markdown}
+    if not incoming:
         raise SystemExit(f"No Markdown files found under {source}")
-    manifest = build_manifest(docs_dir, f"Imported from {source}")
-    manifest_path = root / "corpus"
-    manifest_path.mkdir(parents=True, exist_ok=True)
-    (manifest_path / "manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    conflicts = [str(relative) for relative, raw in incoming.items()
+                 if (docs_dir / relative).exists() and (docs_dir / relative).read_bytes() != raw]
+    if conflicts and not args.overwrite:
+        raise SystemExit("Conflicting files (use --overwrite):\n" + "\n".join(conflicts))
+    root.mkdir(parents=True, exist_ok=True)
     from .kb.index import KnowledgeIndex
-    with KnowledgeIndex(root=root) as index:
-        result = index.rebuild()
+    # Stage a complete generation on the same filesystem before publishing anything.
+    with tempfile.TemporaryDirectory(prefix=".ingest-", dir=root) as directory:
+        stage = Path(directory)
+        staged_docs = stage / "docs"
+        if docs_dir.exists():
+            shutil.copytree(docs_dir, staged_docs)
+        else:
+            staged_docs.mkdir()
+        if args.clean:
+            for path in staged_docs.rglob("*.md"):
+                path.unlink()
+        copied = 0
+        for relative, raw in incoming.items():
+            target = staged_docs / relative
+            if not target.exists() or target.read_bytes() != raw:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(raw)
+                copied += 1
+        manifest = build_manifest(staged_docs, f"Imported from {source}")
+        (stage / "corpus").mkdir()
+        (stage / "corpus/manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        old_db = root / "out/kb.sqlite3"
+        if old_db.exists():
+            with KnowledgeIndex(root) as old, KnowledgeIndex(stage) as new:
+                old.connection.backup(new.connection)
+        with KnowledgeIndex(stage) as index:
+            result = index.rebuild()
+        published = []
+        try:
+            for relative in ("docs", "corpus/manifest.json", "out/kb.sqlite3"):
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                backup = stage / "backup" / relative
+                existed = target.exists()
+                if existed:
+                    backup.parent.mkdir(parents=True, exist_ok=True)
+                    target.replace(backup)
+                published.append((target, backup, existed))
+                (stage / relative).replace(target)
+        except BaseException:
+            for target, backup, existed in reversed(published):
+                if target.is_dir():
+                    shutil.rmtree(target)
+                elif target.exists():
+                    target.unlink()
+                if existed:
+                    backup.replace(target)
+            raise
     print(json.dumps({"root": str(root), "copied": copied, **result}, ensure_ascii=False, indent=2))
 
 
@@ -109,19 +150,23 @@ def command_rebuild(args: argparse.Namespace) -> None:
 
 
 def command_demo(args: argparse.Namespace) -> None:
-    from .mcp_server import Server, demo_registry
-    server = Server(demo_registry())
-    requests = [("initialize", {}), ("tools/list", {}),
-                ("tools/call", {"name": "echo", "arguments": {"message": "hello toolgate"}}),
-                ("tools/call", {"name": "kb_search", "arguments": {"query": "混合检索 重排"}})]
-    for index, (method, params) in enumerate(requests, 1):
-        response = server.handle({"jsonrpc": "2.0", "id": index, "method": method, "params": params})
-        print(json.dumps({"method": method, "response": response}, ensure_ascii=False))
+    from .audit import AuditLog
+    from .mcp_server import Server, demo_registry, run_demo
+    root = find_root(args.root)
+    run_demo(Server(demo_registry(root), AuditLog(root / "out/trace.jsonl")), message="hello toolgate")
 
 
 def command_serve(args: argparse.Namespace) -> None:
     from .mcp_server import Server, demo_registry
-    server = Server(demo_registry())
+    root = find_root(args.root)
+    from .audit import AuditLog
+    from .kb.index import KnowledgeIndex
+    if not (root / "out/kb.sqlite3").is_file():
+        raise SystemExit("Missing knowledge index; run `toolgate ingest` or `toolgate rebuild` first.")
+    with KnowledgeIndex(root) as index:
+        if not index.stats()["documents"]:
+            raise SystemExit("Empty knowledge index; run `toolgate ingest` or `toolgate rebuild` first.")
+    server = Server(demo_registry(root), AuditLog(args.trace or root / "out/trace.jsonl"))
     for line in sys.stdin:
         response = server.handle_line(line)
         if response is not None:
@@ -138,12 +183,16 @@ def run_in_repo(root: Path, argv: list[str]) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="toolgate", description=__doc__)
+    parser.add_argument("--root", dest="global_root")
     commands = parser.add_subparsers(dest="command", required=True)
 
     demo = commands.add_parser("demo", help="Run four JSON-RPC calls against the demo registry")
+    demo.add_argument("--root")
     demo.set_defaults(func=command_demo)
 
     serve = commands.add_parser("serve", help="Serve MCP-style JSON-RPC over stdio")
+    serve.add_argument("--root")
+    serve.add_argument("--trace")
     serve.set_defaults(func=command_serve)
 
     search = commands.add_parser("search", help="Query the hybrid index")
@@ -162,6 +211,7 @@ def main(argv: list[str] | None = None) -> None:
     ingest.add_argument("--from", dest="source", required=True, help="Directory containing .md files")
     ingest.add_argument("--root", default="~/.toolgate", help="Where to place docs/, corpus/ and out/")
     ingest.add_argument("--recursive", action="store_true")
+    ingest.add_argument("--overwrite", action="store_true")
     ingest.add_argument("--clean", action="store_true", help="Delete previously imported Markdown first")
     ingest.set_defaults(func=command_ingest)
 
@@ -176,6 +226,8 @@ def main(argv: list[str] | None = None) -> None:
     dashboard.set_defaults(func=lambda args: run_in_repo(find_root(args.root), ["-m", "src.observability"]))
 
     args = parser.parse_args(argv)
+    if args.global_root:
+        args.root = args.global_root
     args.func(args)
 
 

@@ -1,5 +1,6 @@
 """Append-only call metadata; raw arguments are never persisted."""
 
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -14,13 +15,15 @@ class AuditLog:
         self.path = Path(path)
 
     def record(self, tool: str | None, arguments: object, status: str,
-               duration_ms: float, error_code: str | int | None, *, response: object = None) -> dict:
+               duration_ms: float, error_code: str | int | None, *, response: object = None,
+               request_id: object = None, kb_version: str | None = None) -> dict:
         canonical = json.dumps(arguments, sort_keys=True, ensure_ascii=False,
                                separators=(",", ":"), allow_nan=False)
         output = json.dumps(response, sort_keys=True, ensure_ascii=False,
                             separators=(",", ":"), allow_nan=False)
         # Offline proxy only: ceil(JSON Unicode characters / 4), not model usage.
-        entry = {"trace_id": uuid4().hex, "tool": tool,
+        entry = {"timestamp": datetime.now(timezone.utc).isoformat(),
+                 "request_id": request_id, "kb_version": kb_version, "trace_id": uuid4().hex, "tool": tool,
                  "args_digest": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
                  "status": status, "duration_ms": round(duration_ms, 3),
                  "error_code": error_code,

@@ -70,10 +70,16 @@ def main() -> int:
             "params": {"name": "kb_search", "arguments": {"query": QUERY, "limit": 3}},
         })
         payload = call.get("result", {})
-        if not payload.get("ok"):
+        if payload.get("isError", True):
             return fail(f"kb_search 调用失败：{payload}", 4)
-        ids = [row["doc_id"] for row in payload["result"]["results"]]
-        detail_keys = all("score_detail" in row for row in payload["result"]["results"])
+        rows = json.loads(payload["content"][0]["text"])["results"]
+        ids = [row["doc_id"] for row in rows]
+        for row in rows:
+            source = pathlib.Path(row["source_path"])
+            assert source.is_file(), row
+            assert row["text"] in source.read_text(encoding="utf-8"), row
+        print("citations: original text and existing source_path verified")
+        detail_keys = all("score_detail" in row for row in rows)
         print(f"kb_search top3: {ids}")
         print(f"score_detail 完整：{detail_keys}")
         if not detail_keys:
@@ -103,6 +109,9 @@ def main() -> int:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
+            proc.wait()
+        proc.stdout.close()
+        proc.stderr.close()
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@
 
 ## 结果速览
 
-同一套 20 条人工标注查询、同一份语料，只切换检索模式：
+文档级：同一套 20 条人工标注查询、同一份语料，只切换检索模式：
 
 | 指标 | baseline（仅字面 FTS） | hybrid（本文实现） |
 |---|---:|---:|
@@ -16,8 +16,12 @@
 | Recall@5 | 0.55 | **0.95** |
 | MRR | 0.5500 | **0.8625** |
 
-- **62 条单元测试**全绿；`python3 -S`（禁用 site-packages）下同样全绿，证明主路径零外部依赖
-- **九项验收**逐条带命令与原始输出：见 [out/acceptance.md](out/acceptance.md)
+段落级（20 条新增段落标注（沿用文档级查询），`eval/passages.jsonl`）：baseline Recall@1/3/5 = 0.050 / 0.225 / 0.225，MRR = 0.2250；hybrid Recall@1/3/5 = 0.275 / 0.650 / 0.725，MRR = 0.6113。
+段落级留出集（8 条新查询，`eval/holdout.jsonl`，**未用于调参**）：baseline Recall@1/3/5 = 0 / 0 / 0，MRR = 0；hybrid Recall@1/3/5 = 0.375 / 0.875 / 0.875，MRR = 0.6042。
+段落级相关项为标注的 `doc_id:block_index`，不能用同文档的其他块算命中；按客户端默认每文档最多两段统计，文档级仍用全部候选去重。以上均为本轮离线实跑，完整证据见 [评测报告](eval/report.md)。
+
+- **89 条单元测试**全绿；`python3 -S`（禁用 site-packages）下同样全绿，证明主路径零外部依赖
+- 本轮新增验收见 `tests/test_ingest.py`、`tests/test_e2e_serve.py`、`tests/test_mcp_resilience.py`；运行 `python3 -S -m unittest discover -s tests -v`。历史九项验收记录见 [out/acceptance.md](out/acceptance.md)
 - 20 篇自造语料 / 80 块索引；每次工具调用落审计 trace（含 token 估算标记与耗时）
 - 断网、无 pip 环境下可完整复现
 
@@ -47,15 +51,21 @@ toolgate demo
 toolgate search "混合检索 重排"
 ```
 
+在仓库外运行时，先用 `toolgate ingest --from <文档目录> --root <知识库目录>` 导入文档，再运行 `toolgate demo --root <知识库目录>`。demo 使用所选知识库及其审计目录；找不到知识库或任一演示调用失败时，以非零退出码结束。
+
 `toolgate` 带 `demo`、`serve`、`search`、`rebuild`、`ingest`、`eval`、`dashboard` 七个子命令。`serve` 是给 MCP 客户端连的 stdio 服务端，配置样例见 [MCP-CLIENTS.md](MCP-CLIENTS.md)。
 
 **用自己的文档建索引**
 
 ```sh
-python3 -m src.cli ingest --from ~/notes --root ~/.toolgate
+python3 -m src.cli ingest --from ~/notes --recursive --root ~/.toolgate
 python3 -m src.cli search "你的问题" --root ~/.toolgate
+python3 -m src.cli serve --root ~/.toolgate --trace ~/.toolgate/out/trace.jsonl
 ```
 
+导入保留相对子目录，doc_id 由相对路径逐段规范化生成；重名 ID 明确拒绝。目标内容不同时默认列出冲突，显式加 `--overwrite` 才覆盖；重复导入不重新处理未变文档。`--clean` 只清理旧 Markdown，仍需遵守覆盖规则。源目录与目标 docs 相同或互相包含时拒绝执行。
+导入先在同一文件系统临时目录完成读取、manifest 校验和索引构建，再以原子 rename 发布各文件，异常时恢复旧文件；不支持并发导入/重建，也不提供跨文件断电原子性。
+`--root` 可放在子命令前或后；优先使用显式目录，否则只从当前目录向上找 `corpus/manifest.json`，找不到就给出导入命令，不回退到安装包位置。serve 启动时检查 manifest 和非空索引，缺失时提示先 ingest 或 rebuild。
 导入的语料落在独立目录，不覆盖仓库自带的 20 篇。要注册自己的工具，见 [examples/](examples/README.md)。
 
 一条命令跑通完整调用链：`python3 -m src.mcp_server --demo`，输出 initialize、tools/list 和 echo、kb_search 的 tools/call 结果（默认查询「混合检索 重排」，Top3），同时追加调用审计。
@@ -100,7 +110,8 @@ flowchart TD
 ```
 
 `src/registry.py` 实现工具注册和 JSON Schema 子集，`src/mcp_server.py` 实现三种 JSON-RPC 方法及错误恢复。
-`kb_search(query, limit=3)` 直接调用 CLI 同一个 `KnowledgeIndex.search(..., mode="hybrid")`，返回 doc_id、heading_path、score、score_detail；空索引首次调用自动 rebuild，后续更新语料仍显式 rebuild。
+`kb_search(query, limit=3, mode="passages", max_per_doc=2)` 调用 CLI 同一个 hybrid 索引，返回原始 `text`、绝对 `source_path`、doc_id、heading_path、block_id、score、score_detail。passages 默认同文档最多两段；documents 按文档合并匹配段落，附最佳片段、匹配段落列表和前两段组成的抽取式 summary（不生成模型摘要）。
+Server 将内部 Registry 的 `{ok, result/error}` 转为 MCP `content: [{type: "text", text: JSON}]` 和 `isError`；initialize 提供 protocolVersion、capabilities.tools 和 serverInfo。非法 JSON、非有限数（含 1e999）及超过 64 层的嵌套返回结构化错误，下一条请求仍可处理。
 这是 MCP 风格的最小服务端实现，不声称完成 MCP 全协议兼容或通用 Workflow 执行器。
 
 ## 检索与评测口径
@@ -112,11 +123,12 @@ flowchart TD
 - 评测使用同一 20 条人工标注查询，覆盖全部文档。保留完整候选后按文档首次出现去重；Recall@1/3/5 为相关文档覆盖率宏平均，MRR 为首个正确文档排名倒数宏平均，未命中为零。
 - 平均延迟是单进程每查询一次的检索及文档去重耗时，不包含构建索引；不是并发压测或稳定性能承诺。报告提供语料/用例/实现指纹和逐条排名。
 - hybrid Recall@5 低于 **0.80** 时评测以非零退出；双模式评测同时要求 hybrid 高于 baseline。本轮沿用原参数，未调整切分、RRF、标注或验收阈值。
-- 自造查询与语料的开发集结果只能说明本实现覆盖情况；生产决策还需要独立留出集、无答案请求、同义改写及更大语料。
+- 自造查询与语料的开发集结果只能说明本实现覆盖情况；本轮另加 8 条未用于调参的留出查询；生产决策仍需要无答案请求、更多同义改写及更大语料。
 
 ## 观测与成本估算
 
-审计仅记录 trace_id、工具、入参 SHA-256 摘要、状态、耗时、错误码及 prompt_tokens / completion_tokens / usage_estimated，不落原始参数或响应。
+审计仅记录 timestamp（ISO8601 UTC）、request_id（JSON-RPC id）、kb_version（manifest SHA-256）、trace_id、工具、入参 SHA-256 摘要、状态、耗时、错误码及 prompt_tokens / completion_tokens / usage_estimated，不落原始参数或响应。
+审计失败时调用响应仍返回，附 `degraded: true` 并向 stderr 输出单行告警。token 估算继续基于内部工具结果/错误，不计 MCP 封装。
 面板按文件全部调用计算总数、成功率、错误码分布、P50/P95（排序后位置 `(n-1)×q` 线性插值）。
 坏行、非法耗时或 token 值会明确报错并以非零退出，避免静默丢样本；空文件不虚构成功率和分位数。
 

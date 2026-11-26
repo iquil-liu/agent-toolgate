@@ -47,7 +47,7 @@ def evaluate(index, cases, mode):
     limit = index.stats()["blocks"]
     for case in cases:
         start = perf_counter()
-        results = index.search(case["query"], limit=limit, mode=mode)
+        results = index.search(case["query"], limit=limit, mode=mode, max_per_doc=None)
         metrics, ranked = document_metrics([row["doc_id"] for row in results], case["expected_doc_ids"])
         latency = (perf_counter() - start) * 1000
         details.append({**case, **metrics, "ranked_doc_ids": ranked, "latency_ms": latency})
@@ -55,6 +55,52 @@ def evaluate(index, cases, mode):
             **{key: sum(row[key] for row in details) / len(details)
                for key in ("recall@1", "recall@3", "recall@5", "mrr", "latency_ms")},
             "cases": details}
+
+
+def load_passage_cases(path, index):
+    known = {f"{row[0]}:{row[1]}": row[2] for row in
+             index.connection.execute("SELECT doc_id,block_index,text FROM blocks")}
+    cases = [json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines()]
+    if not cases or len({case.get("query") for case in cases}) != len(cases):
+        raise ValueError("Passage queries must be nonempty and distinct")
+    for case in cases:
+        expected = case.get("expected_block_ids", [])
+        if (not isinstance(case.get("query"), str) or not case["query"].strip()
+                or not case.get("note") or not expected or len(set(expected)) != len(expected)
+                or any(block not in known for block in expected)):
+            raise ValueError("Invalid passage labels")
+        evidence = case.get("evidence", {})
+        if set(evidence) != set(expected) or any(not evidence[block] or evidence[block] not in known[block]
+                                                for block in expected):
+            raise ValueError("Passage evidence must match the annotated source block")
+    return cases
+
+
+def evaluate_passages(index, cases, mode):
+    details = []
+    for case in cases:
+        start = perf_counter()
+        rows = index.search(case["query"], limit=index.stats()["blocks"], mode=mode, max_per_doc=2)
+        metrics, ranked = document_metrics([row["block_id"] for row in rows], case["expected_block_ids"])
+        details.append({**case, **metrics, "ranked_block_ids": ranked,
+                        "latency_ms": (perf_counter() - start) * 1000})
+    return {"mode": mode, "queries": len(cases),
+            **{key: sum(row[key] for row in details) / len(details)
+               for key in ("recall@1", "recall@3", "recall@5", "mrr", "latency_ms")}, "cases": details}
+
+
+def render_passage_report(groups):
+    lines = ["", "## 段落级评测", "",
+             "相关项为人工标注 block_id（doc_id:block_index），附原文证据；不是相关文档的任意段落。",
+             "按客户端 passages 默认每文档最多两段排名；Recall@k 分母是标注相关段落数，MRR 是首个相关段落排名倒数。",
+             "passages 为开发集；holdout 是独立新增查询，未用于调参。两组均为自造小语料，不能代表生产效果。", ""]
+    for name, results in groups.items():
+        lines += [f"### {name}", "", "| 模式 | Recall@1 | Recall@3 | Recall@5 | MRR |",
+                  "|---|---:|---:|---:|---:|"]
+        for result in results:
+            lines.append(f"| {result['mode']} | " + " | ".join(f"{result[key]:.4f}" for key in
+                         ("recall@1", "recall@3", "recall@5", "mrr")) + " |")
+    return "\n".join(lines) + "\n"
 
 
 def render_report(results, fingerprint):
@@ -115,19 +161,27 @@ def main():
         # Always refresh the pair so a single-mode CLI run cannot leave a stale
         # comparison or silently mix different corpus/implementation versions.
         results = [evaluate(index, cases, mode) for mode in ('baseline', 'hybrid')]
+        passage_groups = {}
+        for name in ('passages', 'holdout'):
+            labeled = load_passage_cases(ROOT / f'eval/{name}.jsonl', index)
+            passage_groups[name] = [evaluate_passages(index, labeled, mode) for mode in ('baseline', 'hybrid')]
     digest = hashlib.sha256()
     paths = [ROOT / d['path'] for d in manifest['documents']]
-    paths += sorted((ROOT / 'src/kb').glob('*.py')) + [Path(__file__), ROOT / 'eval/cases.jsonl']
+    paths += sorted((ROOT / 'src/kb').glob('*.py')) + [Path(__file__), ROOT / 'eval/cases.jsonl', ROOT / 'eval/passages.jsonl', ROOT / 'eval/holdout.jsonl']
     for path in sorted(paths):
         digest.update(str(path.relative_to(ROOT)).encode())
         digest.update(path.read_bytes())
     fingerprint = digest.hexdigest()
     (ROOT / 'out/eval-results.json').write_text(json.dumps(
-        {'fingerprint': fingerprint, 'results': results}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-    (ROOT / 'eval/report.md').write_text(render_report(results, fingerprint), encoding='utf-8')
+        {'fingerprint': fingerprint, 'results': results, 'passage_groups': passage_groups}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    (ROOT / 'eval/report.md').write_text(render_report(results, fingerprint) + render_passage_report(passage_groups), encoding='utf-8')
     for result in results:
         if result['mode'] in modes:
-            print(json.dumps({k: v for k, v in result.items() if k != 'cases'}, ensure_ascii=False))
+            print(json.dumps({'level': 'documents', **{k: v for k, v in result.items() if k != 'cases'}}, ensure_ascii=False))
+    for name, group in passage_groups.items():
+        for result in group:
+            if result['mode'] in modes:
+                print(json.dumps({'level': name, **{k: v for k, v in result.items() if k != 'cases'}}, ensure_ascii=False))
     print('Report: eval/report.md; per-query evidence: out/eval-results.json')
     hybrid = next((r for r in results if r['mode'] == 'hybrid'), None)
     if hybrid and hybrid['recall@5'] < 0.80:

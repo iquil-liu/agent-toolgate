@@ -66,6 +66,22 @@ class RegistryTests(unittest.TestCase):
         self.assert_error(self.call(options={}), "SCHEMA_VIOLATION", "$.options.key")
         self.assert_error(self.call(tags=["ok", 1]), "SCHEMA_VIOLATION", "$.tags[1]")
 
+    def test_additional_properties_rejected_before_handler_when_disabled(self):
+        schema = {"type": "object", "additionalProperties": False, "properties": {
+            "options": {"type": "object", "additionalProperties": False,
+                        "properties": {"key": {"type": "string"}}}}}
+        self.registry.register(Tool("strict", "1", "Strict inputs", schema, False,
+                                    lambda **kwargs: self.fail("Invalid handler ran")))
+        for arguments, path in (({"root": "other"}, "$.root"),
+                                ({"options": {"root": "other"}}, "$.options.root")):
+            with self.subTest(path=path):
+                self.assert_error(self.registry.call("strict", arguments), "SCHEMA_VIOLATION", path)
+
+    def test_additional_properties_remain_allowed_by_default(self):
+        result = self.call(extra="preserved")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["result"]["extra"], "preserved")
+
     def test_unknown_tool(self):
         self.assert_error(self.registry.call("absent", {}), "UNKNOWN_TOOL")
 

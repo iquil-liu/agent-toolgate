@@ -8,7 +8,7 @@ help:
 demo: ## 跑通四条 JSON-RPC 调用（initialize / tools.list / tools.call x2）
 	$(PY) -m src.cli demo
 
-test: ## 62 条单元测试
+test: ## 运行全部单元测试
 	$(PY) -m unittest discover -s tests -v
 
 eval: ## 同一份语料对比 baseline 与 hybrid，并写出 eval/report.md

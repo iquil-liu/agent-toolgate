@@ -21,17 +21,15 @@ class P3FixTests(unittest.TestCase):
         calls = [json.loads(line) for line in demo.stdout.splitlines()]
         call = next(row['response']['result'] for row in calls
                     if row['method'] == 'tools/call' and
-                    'results' in row['response']['result'].get('result', {}))
-        self.assertTrue(call['ok'])
+                    'results' in json.loads(row['response']['result']['content'][0]['text']))
+        self.assertFalse(call['isError'])
         cli = subprocess.run([sys.executable, '-m', 'src.kb.cli', 'search', '混合检索 重排'],
                              cwd=ROOT, capture_output=True, text=True, check=True)
         expected = json.loads(cli.stdout)
-        actual = call['result']['results']
+        actual = json.loads(call['content'][0]['text'])['results']
         self.assertEqual(len(actual), 3)
         self.assertEqual([row['doc_id'] for row in actual], [row['doc_id'] for row in expected])
-        self.assertEqual(actual, [{key: row[key] for key in
-                                  ('doc_id', 'heading_path', 'score', 'score_detail')}
-                                 for row in expected])
+        self.assertEqual(actual, expected)
 
     def test_top_k_and_empty_query(self):
         registry = demo_registry()
@@ -50,7 +48,12 @@ class P3FixTests(unittest.TestCase):
                 response = server.handle({'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call',
                                           'params': {'name': name, 'arguments': arguments}})
                 event = json.loads(path.read_text().splitlines()[-1])
-                output = response.get('result', response.get('error'))
+                if 'result' in response:
+                    payload = response['result']
+                    body = json.loads(payload['content'][0]['text'])
+                    output = {'ok': False, 'error': body} if payload['isError'] else {'ok': True, 'result': body}
+                else:
+                    output = response['error']
                 for field, data in [('prompt_tokens', arguments), ('completion_tokens', output)]:
                     canonical = json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
                     self.assertEqual(event[field], (len(canonical) + 3) // 4)

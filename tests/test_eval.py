@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from eval.run_eval import ROOT, document_metrics, evaluate, load_cases
+from eval.run_eval import ROOT, document_metrics, evaluate, evaluate_passages, load_cases, load_passage_cases
 from src.kb.index import KnowledgeIndex
 
 
@@ -53,6 +53,39 @@ class EvaluationTests(unittest.TestCase):
         self.assertGreater(hybrid['recall@5'], baseline['recall@5'])
         self.assertEqual(hybrid['queries'], 20)
         self.assertGreater(hybrid['latency_ms'], 0)
+
+    def test_passage_labels_and_holdout_are_source_grounded_and_distinct(self):
+        with tempfile.TemporaryDirectory() as directory, KnowledgeIndex(ROOT, Path(directory) / 'kb.sqlite3') as index:
+            index.rebuild()
+            passages = load_passage_cases(ROOT / 'eval/passages.jsonl', index)
+            holdout = load_passage_cases(ROOT / 'eval/holdout.jsonl', index)
+            self.assertEqual(len(passages), 20)
+            self.assertEqual(len(holdout), 8)
+            self.assertFalse({c['query'] for c in passages} & {c['query'] for c in holdout})
+            path = Path(directory) / 'bad.jsonl'
+            bad = {**passages[0], 'expected_block_ids': ['missing:0']}
+            path.write_text(json.dumps(bad))
+            with self.assertRaises(ValueError):
+                load_passage_cases(path, index)
+            bad = {**passages[0], 'evidence': {block: 'invented source' for block in passages[0]['expected_block_ids']}}
+            path.write_text(json.dumps(bad))
+            with self.assertRaises(ValueError):
+                load_passage_cases(path, index)
+
+    def test_passage_metrics_count_annotated_blocks_not_any_document_block(self):
+        class FixedIndex:
+            def stats(self):
+                return {'blocks': 4}
+            def search(self, query, **kwargs):
+                self.options = kwargs
+                return [{'block_id': block} for block in ['a:0', 'a:1', 'b:0', 'c:0']]
+        index = FixedIndex()
+        result = evaluate_passages(index, [{'query': 'sample', 'expected_block_ids': ['a:1', 'b:0']}], 'hybrid')
+        self.assertEqual(result['recall@1'], 0)
+        self.assertEqual(result['recall@3'], 1)
+        self.assertEqual(result['recall@5'], 1)
+        self.assertEqual(result['mrr'], .5)
+        self.assertEqual(index.options['max_per_doc'], 2)
 
 
 if __name__ == '__main__':

@@ -53,6 +53,10 @@ def _validate(value: Any, schema: dict, path: str = "$", field: str = "") -> dic
             if key not in value:
                 return failure("SCHEMA_VIOLATION", "Required field is missing",
                                f"{path}.{key}", key)
+        if schema.get("additionalProperties") is False:
+            for key in value:
+                if key not in schema.get("properties", {}):
+                    return failure("SCHEMA_VIOLATION", "Unexpected field", f"{path}.{key}", key)
         for key, child_schema in schema.get("properties", {}).items():
             if key in value:
                 error = _validate(value[key], child_schema, f"{path}.{key}", key)

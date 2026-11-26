@@ -37,10 +37,12 @@ class MCPTests(unittest.TestCase):
 
     def test_call_and_audit_privacy(self):
         response = self.request("tools/call", {"name": "echo", "arguments": {"message": "private text"}})
-        self.assertEqual(response["result"], {"ok": True, "result": {"message": "private text"}})
+        self.assertFalse(response["result"]["isError"])
+        self.assertEqual(json.loads(response["result"]["content"][0]["text"]), {"message": "private text"})
         record = self.records()[0]
         self.assertEqual(set(record), {"trace_id", "tool", "args_digest", "status", "duration_ms", "error_code",
-                                       "prompt_tokens", "completion_tokens", "usage_estimated"})
+                                       "prompt_tokens", "completion_tokens", "usage_estimated",
+                                       "timestamp", "request_id", "kb_version"})
         self.assertIs(record["usage_estimated"], True)
         self.assertEqual(record["status"], "success")
         self.assertIsNone(record["error_code"])
@@ -74,7 +76,7 @@ class MCPTests(unittest.TestCase):
         for name, arguments, expected in (("missing", {}, "UNKNOWN_TOOL"),
                                            ("echo", {}, "SCHEMA_VIOLATION")):
             response = self.request("tools/call", {"name": name, "arguments": arguments})
-            self.assertEqual(response["result"]["error"]["code"], expected)
+            self.assertEqual(json.loads(response["result"]["content"][0]["text"])["code"], expected)
             self.assertEqual(self.records()[-1]["error_code"], expected)
             self.assertEqual(self.records()[-1]["status"], "error")
 
@@ -105,17 +107,17 @@ class MCPTests(unittest.TestCase):
     def test_demo_tools_are_callable(self):
         query = "混合检索 重排"
         kb = self.request("tools/call", {"name": "kb_search", "arguments": {"query": query}})
-        self.assertTrue(kb["result"]["ok"])
-        self.assertNotIn("status", kb["result"]["result"])
+        self.assertFalse(kb["result"]["isError"])
+        self.assertNotIn("status", json.loads(kb["result"]["content"][0]["text"]))
         cli = subprocess.run([sys.executable, "-S", "-m", "src.kb.cli", "search", query],
                              capture_output=True, text=True, check=True,
                              cwd=Path(__file__).resolve().parents[1], timeout=10)
-        results = kb["result"]["result"]["results"]
+        results = json.loads(kb["result"]["content"][0]["text"])["results"]
         self.assertEqual(len(results), 3)
         self.assertEqual([row["doc_id"] for row in results],
                          [row["doc_id"] for row in json.loads(cli.stdout)])
         clock = self.request("tools/call", {"name": "clock"})
-        self.assertTrue(clock["result"]["result"]["utc"].endswith("+00:00"))
+        self.assertTrue(json.loads(clock["result"]["content"][0]["text"])["utc"].endswith("+00:00"))
 
     def test_real_stdio_recovers_after_parse_error(self):
         payload = '{bad\n' + json.dumps({"jsonrpc": "2.0", "id": "next", "method": "tools/list"}) + '\n'

@@ -116,11 +116,14 @@ class KnowledgeIndex:
                     df.update(json.loads(row[0]).keys())
                     count += 1
                 self.connection.execute("INSERT OR REPLACE INTO metadata VALUES ('idf',?)", (json.dumps([count, dict(df)]),))
-        if manifest_changed:
-            # Publish the verified snapshot only after a successful index update.
-            temporary = manifest_path.with_suffix(".json.tmp")
-            temporary.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            temporary.replace(manifest_path)
+            if manifest_changed:
+                # A failed manifest write must roll back the database transaction.
+                temporary = manifest_path.with_suffix(".json.tmp")
+                try:
+                    temporary.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                    temporary.replace(manifest_path)
+                finally:
+                    temporary.unlink(missing_ok=True)
         return {"processed_documents": changed, "unchanged_documents": skipped, "deleted_documents": len(removed), **self.stats()}
 
     def _delete(self, doc_id):
@@ -133,7 +136,8 @@ class KnowledgeIndex:
                 "blocks": self.connection.execute("SELECT count(*) FROM blocks").fetchone()[0],
                 "index_size_bytes": self.db_path.stat().st_size}
 
-    def search(self, query: str, limit: int = 3, mode: str = "hybrid") -> list[dict]:
+    def search(self, query: str, limit: int = 3, mode: str = "hybrid",
+               max_per_doc: int | None = 2) -> list[dict]:
         if mode not in ("hybrid", "baseline"):
             raise ValueError("mode must be hybrid or baseline")
         terms = query_terms(query)
@@ -159,6 +163,7 @@ class KnowledgeIndex:
             fused = rrf([lexical, semantic])
         lexical_ranks = {key: rank for rank, key in enumerate(lexical, 1)}
         vector_ranks = {key: rank for rank, key in enumerate(semantic, 1)}
+        paths = {row["doc_id"]: row["path"] for row in self.connection.execute("SELECT doc_id,path FROM documents")}
         results = []
         for key, fusion in fused.items():
             row = rows[key]
@@ -174,7 +179,9 @@ class KnowledgeIndex:
             if not shared:
                 continue
             score = fusion + (0.04 * title_hit + 0.02 * coverage if mode == "hybrid" else 0)
-            results.append({"doc_id": row["doc_id"], "heading_path": heading,
+            results.append({"doc_id": row["doc_id"],
+                            "block_id": f"{row['doc_id']}:{row['block_index']}",
+                            "source_path": str(self.root / paths[row["doc_id"]]), "heading_path": heading,
                             "block_index": row["block_index"], "text": row["text"], "score": score,
                             "score_detail": {"fts_rank": lexical_ranks.get(key), "vector_rank": vector_ranks.get(key),
                                              "cosine": vector_scores.get(key, 0), "rrf": fusion,
@@ -182,4 +189,12 @@ class KnowledgeIndex:
                                              "title_boost": 0.04 * title_hit if mode == "hybrid" else 0,
                                              "coverage_boost": 0.02 * coverage if mode == "hybrid" else 0}})
         results.sort(key=lambda result: (-result["score"], result["doc_id"], result["block_index"]))
+        if max_per_doc is not None:
+            counts = Counter()
+            diverse = []
+            for row in results:
+                if counts[row["doc_id"]] < max_per_doc:
+                    diverse.append(row)
+                    counts[row["doc_id"]] += 1
+            results = diverse
         return results[:limit]
