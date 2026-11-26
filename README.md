@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/iquil-liu/agent-toolgate/actions/workflows/ci.yml/badge.svg)](https://github.com/iquil-liu/agent-toolgate/actions/workflows/ci.yml)
 
-一个可离线运行的 Python 工具调用与知识检索作品集：工具契约、JSON-RPC stdio、审计、FTS5 + 字符向量混合检索、可解释重排、评测和调用观测。
+一个可离线运行的 Python 工具调用与知识检索框架：工具契约、JSON-RPC stdio、审计、FTS5 + 字符向量混合检索、可解释重排、评测和调用观测。
 语料为完全自造的 20 篇通用技术文档，不含真实组织、域名、凭据。主路径仅使用标准库，不联网、不下载模型。
 
 ## 结果速览
@@ -36,7 +36,7 @@ python3 -m unittest discover -s tests -v
 python3 scripts/mcp_client_probe.py
 ```
 
-一条命令跑演示：`python3 -m src.mcp_server --demo`，输出 initialize、tools/list 和 echo、kb_search 的 tools/call 结果（默认查询「混合检索 重排」，Top3），同时追加调用审计。
+一条命令跑通完整调用链：`python3 -m src.mcp_server --demo`，输出 initialize、tools/list 和 echo、kb_search 的 tools/call 结果（默认查询「混合检索 重排」，Top3），同时追加调用审计。
 一条命令生成双模式评测：`python3 eval/run_eval.py`，自动增量 rebuild，输出指标并生成 [评测报告](eval/report.md) 与逐条证据 `out/eval-results.json`。
 执行 `python3 -m src.observability` 后打开 [观测面板](out/dashboard.md)。缺少日志时先跑 demo；面板不会伪造调用样本。
 
@@ -79,7 +79,7 @@ flowchart TD
 
 `src/registry.py` 实现工具注册和 JSON Schema 子集，`src/mcp_server.py` 实现三种 JSON-RPC 方法及错误恢复。
 `kb_search(query, limit=3)` 直接调用 CLI 同一个 `KnowledgeIndex.search(..., mode="hybrid")`，返回 doc_id、heading_path、score、score_detail；空索引首次调用自动 rebuild，后续更新语料仍显式 rebuild。
-这是 MCP 风格演示服务，不声称完成 MCP 全协议兼容或通用 Workflow 执行器。
+这是 MCP 风格的最小服务端实现，不声称完成 MCP 全协议兼容或通用 Workflow 执行器。
 
 ## 检索与评测口径
 
@@ -90,7 +90,7 @@ flowchart TD
 - 评测使用同一 20 条人工标注查询，覆盖全部文档。保留完整候选后按文档首次出现去重；Recall@1/3/5 为相关文档覆盖率宏平均，MRR 为首个正确文档排名倒数宏平均，未命中为零。
 - 平均延迟是单进程每查询一次的检索及文档去重耗时，不包含构建索引；不是并发压测或稳定性能承诺。报告提供语料/用例/实现指纹和逐条排名。
 - hybrid Recall@5 低于 **0.80** 时评测以非零退出；双模式评测同时要求 hybrid 高于 baseline。本轮沿用原参数，未调整切分、RRF、标注或验收阈值。
-- 自造查询与语料的开发集结果只能说明本演示覆盖情况；生产决策还需要独立留出集、无答案请求、同义改写及更大语料。
+- 自造查询与语料的开发集结果只能说明本实现覆盖情况；生产决策还需要独立留出集、无答案请求、同义改写及更大语料。
 
 ## 观测与成本估算
 
@@ -112,7 +112,7 @@ python3 -m src.observability --trace out/trace.jsonl --output out/dashboard.md -
 
 ## 设计取舍
 
-1. **标准库与 SQLite 优先**：免安装、离线可演示；代价是没有网络服务扩展能力，依赖宿主 Python 的 FTS5 支持。
+1. **标准库与 SQLite 优先**：免安装、离线可运行；代价是没有网络服务扩展能力，依赖宿主 Python 的 FTS5 支持。
 2. **哈希字符向量替代模型下载**：可跨进程复现并补充中文局部匹配；代价是碰撞、同义表达召回能力有限。
 3. **RRF 与透明规则重排**：融合不同比例的排名并允许手算解释；代价是无法替代训练后的语义重排模型。
 4. **保存特征计数并增量重建**：未变文档不再切分，变更后统一刷新 IDF；代价是查询仍需逐块转换向量，大规模延迟线性增长。
@@ -122,5 +122,5 @@ python3 -m src.observability --trace out/trace.jsonl --output out/dashboard.md -
 
 生产化优先接入供应商真实用量采集和任务关联，再替换 bge-m3 / ANN / 语义重排，并用独立评测集验证质量、延迟与成本。
 随后增加身份认证、实际授权门禁、调用预算、超时取消、日志轮转与脱敏审查；本项目目前仅提供相关自造文档及局部基础能力，没有实现这些完整生产机制。
-stdio、追加 JSONL 和单机 SQLite 适用于演示；多进程持久化、日志窗口及高并发仍需工程化设计。
-当前仓库已公开于 `github.com/iquil-liu/agent-toolgate`，CI 覆盖索引重建、单元测试、零依赖复跑、工具演示、检索评测与观测面板六个步骤。MCP 服务是风格最小实现，尚未在真实 MCP 客户端（Claude Desktop / Cursor）实测接入，配置样例见 `MCP-CLIENTS.md`，标注为待人工验证。
+stdio、追加 JSONL 和单机 SQLite 适用于单机与原型；多进程持久化、日志窗口及高并发仍需工程化设计。
+当前仓库已公开于 `github.com/iquil-liu/agent-toolgate`，CI 覆盖索引重建、单元测试、零依赖复跑、工具调用链、检索评测与观测面板六个步骤。MCP 服务是风格最小实现，尚未在真实 MCP 客户端（Claude Desktop / Cursor）实测接入，配置样例见 `MCP-CLIENTS.md`，标注为待人工验证。

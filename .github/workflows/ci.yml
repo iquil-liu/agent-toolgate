@@ -24,7 +24,7 @@ jobs:
       - name: 零第三方依赖复跑
         run: python3 -S -m unittest discover -s tests -v
 
-      - name: MCP 演示（工具列表与真实检索调用）
+      - name: MCP 调用链（工具列表与真实检索）
         run: python3 -m src.mcp_server --demo
 
       - name: 独立客户端握手探针（非 demo 分支驱动）
