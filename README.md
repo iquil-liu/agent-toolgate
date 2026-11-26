@@ -1,5 +1,7 @@
 # Agent-Toolgate
 
+[![CI](https://github.com/iquil-liu/agent-toolgate/actions/workflows/ci.yml/badge.svg)](https://github.com/iquil-liu/agent-toolgate/actions/workflows/ci.yml)
+
 一个可离线运行的 Python 工具调用与知识检索作品集：工具契约、JSON-RPC stdio、审计、FTS5 + 字符向量混合检索、可解释重排、评测和调用观测。
 语料为完全自造的 20 篇通用技术文档，不含真实组织、域名、凭据。主路径仅使用标准库，不联网、不下载模型。
 
