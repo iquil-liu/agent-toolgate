@@ -7,3 +7,9 @@ out/acceptance/
 out/eval-results.json
 out/codex-*.log
 out/kb.sqlite3
+
+# packaging artifacts
+*.egg-info/
+build/
+dist/
+.venv/

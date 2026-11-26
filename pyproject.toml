@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-toolgate"
+version = "0.1.0"
+description = "Zero-dependency agent framework: MCP-style tool contracts, hybrid FTS5/vector retrieval, reproducible evaluation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Liu Qi", email = "iquil-liu@users.noreply.github.com" }]
+keywords = ["agent", "mcp", "rag", "retrieval", "fts5", "evaluation"]
+
+[project.urls]
+Homepage = "https://github.com/iquil-liu/agent-toolgate"
+Source = "https://github.com/iquil-liu/agent-toolgate"
+
+[project.scripts]
+toolgate = "toolgate.cli:main"
+
+[tool.setuptools]
+packages = ["toolgate", "toolgate.kb"]
+package-dir = { "toolgate" = "src", "toolgate.kb" = "src/kb" }

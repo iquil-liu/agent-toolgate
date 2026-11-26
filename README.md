@@ -23,18 +23,40 @@
 
 ## 快速开始
 
-环境：Python 3.11+，其 sqlite3 编译时需启用 FTS5；无需 pip install。命令在仓库根目录执行。
+需要 Python 3.11+，且其 sqlite3 编译时启用了 FTS5（macOS 自带、官方安装包与 CI 环境默认满足）。两种用法选一种即可。
+
+**A. 仓库内直接跑（零安装、零第三方依赖）**
 
 ```sh
-python3 -m src.kb.cli rebuild
-python3 -m src.mcp_server --demo
-python3 -m src.kb.cli stats
-python3 -m src.kb.cli search "混合检索 重排"
-python3 eval/run_eval.py
+git clone https://github.com/iquil-liu/agent-toolgate && cd agent-toolgate
+python3 -m src.cli demo        # 四条 JSON-RPC 调用：initialize / tools.list / tools.call x2
+python3 -m src.cli rebuild     # 建索引，20 篇语料切成 80 块
+python3 -m src.cli search "混合检索 重排"
+python3 eval/run_eval.py --hybrid
 python3 -m src.observability
 python3 -m unittest discover -s tests -v
-python3 scripts/mcp_client_probe.py
 ```
+
+或者直接用 `make demo`、`make test`、`make eval`、`make dashboard`、`make probe`，目标定义见 [Makefile](Makefile)。
+
+**B. 装成命令**
+
+```sh
+pip install -e .
+toolgate demo
+toolgate search "混合检索 重排"
+```
+
+`toolgate` 带 `demo`、`serve`、`search`、`rebuild`、`ingest`、`eval`、`dashboard` 七个子命令。`serve` 是给 MCP 客户端连的 stdio 服务端，配置样例见 [MCP-CLIENTS.md](MCP-CLIENTS.md)。
+
+**用自己的文档建索引**
+
+```sh
+python3 -m src.cli ingest --from ~/notes --root ~/.toolgate
+python3 -m src.cli search "你的问题" --root ~/.toolgate
+```
+
+导入的语料落在独立目录，不覆盖仓库自带的 20 篇。要注册自己的工具，见 [examples/](examples/README.md)。
 
 一条命令跑通完整调用链：`python3 -m src.mcp_server --demo`，输出 initialize、tools/list 和 echo、kb_search 的 tools/call 结果（默认查询「混合检索 重排」，Top3），同时追加调用审计。
 一条命令生成双模式评测：`python3 eval/run_eval.py`，自动增量 rebuild，输出指标并生成 [评测报告](eval/report.md) 与逐条证据 `out/eval-results.json`。
