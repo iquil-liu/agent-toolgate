@@ -33,6 +33,7 @@ python3 -m src.kb.cli search "混合检索 重排"
 python3 eval/run_eval.py
 python3 -m src.observability
 python3 -m unittest discover -s tests -v
+python3 scripts/mcp_client_probe.py
 ```
 
 一条命令跑演示：`python3 -m src.mcp_server --demo`，输出 initialize、tools/list 和 echo、kb_search 的 tools/call 结果（默认查询「混合检索 重排」，Top3），同时追加调用审计。

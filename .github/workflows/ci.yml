@@ -27,6 +27,9 @@ jobs:
       - name: MCP 演示（工具列表与真实检索调用）
         run: python3 -m src.mcp_server --demo
 
+      - name: 独立客户端握手探针（非 demo 分支驱动）
+        run: python3 scripts/mcp_client_probe.py
+
       - name: 混合检索评测（Recall@5 低于 0.80 则失败）
         run: python3 eval/run_eval.py --hybrid
 
