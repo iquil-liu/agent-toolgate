@@ -123,4 +123,4 @@ python3 -m src.observability --trace out/trace.jsonl --output out/dashboard.md -
 生产化优先接入供应商真实用量采集和任务关联，再替换 bge-m3 / ANN / 语义重排，并用独立评测集验证质量、延迟与成本。
 随后增加身份认证、实际授权门禁、调用预算、超时取消、日志轮转与脱敏审查；本项目目前仅提供相关自造文档及局部基础能力，没有实现这些完整生产机制。
 stdio、追加 JSONL 和单机 SQLite 适用于演示；多进程持久化、日志窗口及高并发仍需工程化设计。
-当前仓库已公开于 `github.com/iquil-liu/agent-toolgate`，CI 覆盖索引重建、单元测试、零依赖复跑、工具演示、检索评测与观测面板六个步骤。MCP 服务是风格最小实现，尚未在真实 MCP 客户端（Claude Desktop / Cursor）实测接入，配置样例见 `docs/mcp-clients.md`，标注为待人工验证。
+当前仓库已公开于 `github.com/iquil-liu/agent-toolgate`，CI 覆盖索引重建、单元测试、零依赖复跑、工具演示、检索评测与观测面板六个步骤。MCP 服务是风格最小实现，尚未在真实 MCP 客户端（Claude Desktop / Cursor）实测接入，配置样例见 `MCP-CLIENTS.md`，标注为待人工验证。
