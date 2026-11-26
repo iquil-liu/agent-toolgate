@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "description": "完全自造的通用技术语料，不含真实组织、域名或凭据",
+  "documents": [
+    {
+      "doc_id": "mcp-tools",
+      "path": "docs/mcp-tools.md",
+      "title": "MCP 协议与工具注册",
+      "tags": [
+        "MCP",
+        "JSON-RPC",
+        "stdio",
+        "工具注册",
+        "能力协商"
+      ],
+      "mtime_ns": 1795674195740127219,
+      "sha256": "626e13ba96fdff905110b3ca2133f4cd3d80b8fa8234910fade76906ae374f14"
+    },
+    {
+      "doc_id": "agent-workflow",
+      "path": "docs/agent-workflow.md",
+      "title": "Agent 编排与 Workflow",
+      "tags": [
+        "Agent",
+        "Workflow",
+        "状态机",
+        "检查点",
+        "补偿"
+      ],
+      "mtime_ns": 1795674195740275344,
+      "sha256": "c1949951f457ac614afff913bc25dac3b3019a6cdee7acef71df2dbc08f98def"
+    },
+    {
+      "doc_id": "context-memory",
+      "path": "docs/context-memory.md",
+      "title": "上下文管理与记忆",
+      "tags": [
+        "上下文窗口",
+        "短期记忆",
+        "长期记忆",
+        "摘要",
+        "来源"
+      ],
+      "mtime_ns": 1795674195740384011,
+      "sha256": "5df863527570a11a935130abc2074cd0671b7f349a32d2ea730212db9f5e2cbf"
+    },
+    {
+      "doc_id": "idempotency",
+      "path": "docs/idempotency.md",
+      "title": "幂等与重复投递",
+      "tags": [
+        "幂等键",
+        "重复投递",
+        "去重",
+        "事务",
+        "结果缓存"
+      ],
+      "mtime_ns": 1795674195740474637,
+      "sha256": "754d9316f3a77e3c669b61236e6ef1ee3c614fdb12de86ef5235789d89e0db75"
+    },
+    {
+      "doc_id": "retry-backoff",
+      "path": "docs/retry-backoff.md",
+      "title": "失败重试与退避",
+      "tags": [
+        "指数退避",
+        "随机抖动",
+        "重试预算",
+        "限流",
+        "瞬时错误"
+      ],
+      "mtime_ns": 1795674195740562179,
+      "sha256": "353dbe9275f89b4c39de05dd968eae3eee0704a307d7a481d8100e6f52397371"
+    },
+    {
+      "doc_id": "timeout-cancel",
+      "path": "docs/timeout-cancel.md",
+      "title": "超时与取消",
+      "tags": [
+        "截止时间",
+        "取消令牌",
+        "连接超时",
+        "资源释放",
+        "超时预算"
+      ],
+      "mtime_ns": 1795674195740644305,
+      "sha256": "85fd1c7fcc23f49bb544e94543b3f52a4f81111c044f83f25da723c7b3e15712"
+    },
+    {
+      "doc_id": "tool-contract",
+      "path": "docs/tool-contract.md",
+      "title": "工具契约校验",
+      "tags": [
+        "JSON Schema",
+        "类型校验",
+        "必填字段",
+        "枚举",
+        "结构化错误"
+      ],
+      "mtime_ns": 1795674195740733388,
+      "sha256": "49bd158bde37ea3991baf87b0dfab2ef1a55f7fa7cef361e85086fd7c47f6c6f"
+    },
+    {
+      "doc_id": "least-privilege",
+      "path": "docs/least-privilege.md",
+      "title": "权限与最小授权",
+      "tags": [
+        "最小授权",
+        "权限范围",
+        "资源隔离",
+        "授权门禁",
+        "拒绝策略"
+      ],
+      "mtime_ns": 1795674195740825972,
+      "sha256": "c8808ae1fea006b24c4e0e9c48a60428d1f6b9300dd795826c6421deb194d74d"
+    },
+    {
+      "doc_id": "secret-audit",
+      "path": "docs/secret-audit.md",
+      "title": "密钥管理与审计",
+      "tags": [
+        "密钥轮换",
+        "令牌",
+        "凭据隔离",
+        "脱敏",
+        "访问审计"
+      ],
+      "mtime_ns": 1795674195740933973,
+      "sha256": "939b9ea930a64b84013c7d2fecd9aaedc64a8e7a42dfac3c6b1793c3bad2c1e5"
+    },
+    {
+      "doc_id": "audit-log",
+      "path": "docs/audit-log.md",
+      "title": "审计日志设计",
+      "tags": [
+        "JSONL",
+        "入参摘要",
+        "事件标识",
+        "追加写入",
+        "错误码"
+      ],
+      "mtime_ns": 1795674195741027223,
+      "sha256": "2f29fc190e365ac2ceb7f9fbaf72d04bc1917eb2ce6963421f35140987dff546"
+    },
+    {
+      "doc_id": "observability-trace",
+      "path": "docs/observability-trace.md",
+      "title": "可观测性与 trace",
+      "tags": [
+        "trace",
+        "span",
+        "延迟分位数",
+        "错误率",
+        "关联标识"
+      ],
+      "mtime_ns": 1795674195741144516,
+      "sha256": "386188db2498e4856d8d5d1062440a8252901af98e0e4296a574a528a0360408"
+    },
+    {
+      "doc_id": "cost-quota",
+      "path": "docs/cost-quota.md",
+      "title": "成本控制与配额",
+      "tags": [
+        "token",
+        "配额",
+        "预算",
+        "单价",
+        "成本估算"
+      ],
+      "mtime_ns": 1795674195741222099,
+      "sha256": "74d5d29c8ee393c7edd3e7a3381701c4b71b81ecd3ea80781d70d341cf0bc0f1"
+    },
+    {
+      "doc_id": "rag-splitting",
+      "path": "docs/rag-splitting.md",
+      "title": "RAG 文档切分策略",
+      "tags": [
+        "RAG",
+        "标题层级",
+        "段落",
+        "块大小",
+        "元数据"
+      ],
+      "mtime_ns": 1795674195741301058,
+      "sha256": "71d9e456884e24de649f7d52799c28c7477e257f7244068f6ee96107affdb771"
+    },
+    {
+      "doc_id": "vector-ann",
+      "path": "docs/vector-ann.md",
+      "title": "向量检索与 ANN",
+      "tags": [
+        "向量检索",
+        "ANN",
+        "余弦相似度",
+        "归一化",
+        "embedding"
+      ],
+      "mtime_ns": 1795674195741389183,
+      "sha256": "caf47940b53d749d7d9a6c8041378312795df53c346475de33b03641b14e1e98"
+    },
+    {
+      "doc_id": "hybrid-rrf",
+      "path": "docs/hybrid-rrf.md",
+      "title": "混合检索与 RRF",
+      "tags": [
+        "混合检索",
+        "RRF",
+        "FTS5",
+        "倒排索引",
+        "候选融合"
+      ],
+      "mtime_ns": 1795674195741474684,
+      "sha256": "5bb0837e135d9df67e4c1951ca71b1ae8d2dabc67ff41500d0f7e75ca9a6ab15"
+    },
+    {
+      "doc_id": "reranking",
+      "path": "docs/reranking.md",
+      "title": "重排模型与 score_detail",
+      "tags": [
+        "重排",
+        "标题命中",
+        "词项覆盖率",
+        "score_detail",
+        "候选集"
+      ],
+      "mtime_ns": 1795674195741558601,
+      "sha256": "0725d635b066db5a7a4f6537761a54252e8cf4dc34a9df6bbf4fc87132903f6f"
+    },
+    {
+      "doc_id": "evaluation-set",
+      "path": "docs/evaluation-set.md",
+      "title": "评测集构建",
+      "tags": [
+        "评测集",
+        "标注",
+        "困难负例",
+        "数据泄漏",
+        "查询分层"
+      ],
+      "mtime_ns": 1795674195741635268,
+      "sha256": "a4f4d951cb9e2bd2e196aa8e9fb9cffe0b0d1038faf395855f0f01e265a834c8"
+    },
+    {
+      "doc_id": "recall-mrr",
+      "path": "docs/recall-mrr.md",
+      "title": "Recall 与 MRR 指标",
+      "tags": [
+        "Recall",
+        "MRR",
+        "TopK",
+        "相关文档",
+        "平均延迟"
+      ],
+      "mtime_ns": 1795674195741713143,
+      "sha256": "8154746825c2fc84016a1ada6e14c449bf743dcb76a4f5d83021e071e5b91353"
+    },
+    {
+      "doc_id": "agent-handoff",
+      "path": "docs/agent-handoff.md",
+      "title": "多 Agent 协作与交接",
+      "tags": [
+        "多 Agent",
+        "交接",
+        "任务边界",
+        "检查点",
+        "所有权"
+      ],
+      "mtime_ns": 1795674195741788894,
+      "sha256": "17fa359b2165cb0820a63663163d1c962e8a85afae481c47b7b689aba2ba5f1e"
+    },
+    {
+      "doc_id": "single-truth",
+      "path": "docs/single-truth.md",
+      "title": "冲突规则与单一真源",
+      "tags": [
+        "单一真源",
+        "版本",
+        "冲突规则",
+        "优先级",
+        "证据"
+      ],
+      "mtime_ns": 1795674195741875269,
+      "sha256": "a8de86c2d5d32e23d98393357316f1655e9d76b330b3a2cdde9e44674f872955"
+    }
+  ]
+}

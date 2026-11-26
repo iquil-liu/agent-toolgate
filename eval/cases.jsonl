@@ -1,0 +1,20 @@
+{"query":"MCP stdio 工具注册","expected_doc_ids":["mcp-tools"],"note":"精确术语；连接与能力协商、工具发现章节说明协议通道和注册声明。"}
+{"query":"编排器怎样恢复中断的步骤","expected_doc_ids":["agent-workflow"],"note":"自然问句；状态与步骤章节说明读取检查点、保存结果引用。"}
+{"query":"上下文窗口 摘要 来源","expected_doc_ids":["context-memory"],"note":"精确术语；信息分层与压缩恢复章节要求保留目标、约束与来源。"}
+{"query":"响应丢失后怎样避免重复写入","expected_doc_ids":["idempotency"],"note":"自然问句；结果回读与原子边界章节覆盖响应丢失、去重事务和缓存。"}
+{"query":"指数退避 随机抖动","expected_doc_ids":["retry-backoff"],"note":"精确术语；等待策略章节说明增长等待和分散恢复。"}
+{"query":"客户端停止等待是否代表写入撤销","expected_doc_ids":["timeout-cancel"],"note":"自然问句；取消传播章节明确停止等待不等于服务端撤销。"}
+{"query":"JSON Schema 布尔值 整数","expected_doc_ids":["tool-contract"],"note":"精确术语；输入边界章节要求区分布尔与整数类型。"}
+{"query":"权限/最小授权:(资源隔离)","expected_doc_ids":["least-privilege"],"note":"符号查询；权限建模与隔离验证章节限定动作资源与授权范围。"}
+{"query":"密钥轮换 脱敏","expected_doc_ids":["secret-audit"],"note":"精确术语；生命周期和审计最小化章节说明轮换窗口与敏感信息处理。"}
+{"query":"相同参数字段顺序变化后摘要应一致吗","expected_doc_ids":["audit-log"],"note":"自然问句；隐私与完整性章节要求规范序列化后计算摘要。"}
+{"query":"trace span 延迟分位数","expected_doc_ids":["observability-trace"],"note":"精确术语；链路关联与指标口径章节说明阶段关联和长尾延迟。"}
+{"query":"失败调用也需要计算成本吗","expected_doc_ids":["cost-quota"],"note":"自然问句；配额执行章节明确重试和失败调用也可能产生成本。"}
+{"query":"RAG 标题层级 段落","expected_doc_ids":["rag-splitting"],"note":"精确术语；结构优先与长度边界章节说明章节和段落切分。"}
+{"query":"哈希向量碰撞能代表语义理解吗","expected_doc_ids":["vector-ann"],"note":"自然问句；搜索取舍章节说明哈希碰撞与语义能力局限。"}
+{"query":"混合检索 RRF FTS5","expected_doc_ids":["hybrid-rrf"],"note":"精确术语；两路召回与融合章节说明全文、向量排名融合。"}
+{"query":"重排能找回没有进入候选的文档吗","expected_doc_ids":["reranking"],"note":"自然问句；召回边界章节说明重排只能调整已召回候选。"}
+{"query":"评测集 困难负例 数据泄漏","expected_doc_ids":["evaluation-set"],"note":"精确术语；标注质量与实验隔离章节说明困难负例和留出样本。"}
+{"query":"多个相关答案的召回率分母如何确定","expected_doc_ids":["recall-mrr"],"note":"自然问句；召回计算章节说明多相关文档的分母和文档去重。"}
+{"query":"多 Agent 交接 所有权","expected_doc_ids":["agent-handoff"],"note":"精确术语；交接内容与冲突处理章节说明任务状态和文件所有权。"}
+{"query":"并发写入冲突后可以只更新版本号重试吗","expected_doc_ids":["single-truth"],"note":"自然问句；变更验证章节要求重新读取合并，禁止强行覆盖。"}

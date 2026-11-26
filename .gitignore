@@ -1,0 +1,9 @@
+# 运行产物与本地日志（保留验收证据 acceptance.md、dashboard.md）
+__pycache__/
+*.pyc
+.DS_Store
+out/*.jsonl
+out/acceptance/
+out/eval-results.json
+out/codex-*.log
+out/kb.sqlite3
